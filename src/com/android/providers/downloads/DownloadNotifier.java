@@ -344,7 +344,7 @@ public class DownloadNotifier {
             // Calculate and show progress
             String remainingText = null;
             String percentText = null;
-            String speedAsSizeText = null;
+            String speedText = null;
             if (type == TYPE_ACTIVE) {
                 long current = 0;
                 long total = 0;
@@ -370,27 +370,11 @@ public class DownloadNotifier {
                             NumberFormat.getPercentInstance().format((double) current / total);
 
                     if (speed > 0) {
+                        speedText = res.getString(R.string.download_speed,
+                                Formatter.formatFileSize(mContext, speed));
                         final long remainingMillis = ((total - current) * 1000) / speed;
-                        final int duration, durationResId;
-
-                        // This duplicates DateUtils.formatDuration(),
-                        // but uses our abbreviated plurals.
-                        if (remainingMillis >= DateUtils.HOUR_IN_MILLIS) {
-                            duration = (int) ((remainingMillis + 1800000)
-                                    / DateUtils.HOUR_IN_MILLIS);
-                            durationResId = R.plurals.duration_hours;
-                        } else if (remainingMillis >= DateUtils.MINUTE_IN_MILLIS) {
-                            duration = (int) ((remainingMillis + 30000)
-                                    / DateUtils.MINUTE_IN_MILLIS);
-                            durationResId = R.plurals.duration_minutes;
-                        } else {
-                            duration = (int) ((remainingMillis + 500)
-                                    / DateUtils.SECOND_IN_MILLIS);
-                            durationResId = R.plurals.duration_seconds;
-                        }
                         remainingText = res.getString(R.string.download_remaining,
-                                res.getQuantityString(durationResId, duration, duration));
-                        speedAsSizeText = Formatter.formatFileSize(mContext, speed);
+                                DateUtils.formatDuration(remainingMillis));
                     }
 
                     final int percent = (int) ((current * 100) / total);
@@ -398,6 +382,44 @@ public class DownloadNotifier {
                 } else {
                     builder.setProgress(100, 0, true);
                 }
+            }
+
+            int combo = 0;
+            if (!TextUtils.isEmpty(percentText)) {
+                combo += 1;
+            }
+            if (!TextUtils.isEmpty(speedText)) {
+                combo += 2;
+            }
+            if (!TextUtils.isEmpty(remainingText)) {
+                combo += 4;
+            }
+            String subtext;
+            switch (combo) {
+                case 1:
+                    subtext = percentText;
+                    break;
+                case 2:
+                    subtext = speedText;
+                    break;
+                case 3:
+                    subtext = speedText + ", " + percentText;
+                    break;
+                case 4:
+                    subtext = remainingText;
+                    break;
+                case 5:
+                    subtext = remainingText + ", " + percentText;
+                    break;
+                case 6:
+                    subtext = speedText + ", " + remainingText;
+                    break;
+                case 7:
+                    subtext = speedText + ", " + remainingText + ", " + percentText;
+                    break;
+                default:
+                    subtext = "";
+                    break;
             }
 
             // Build titles and description
@@ -409,18 +431,13 @@ public class DownloadNotifier {
                 if (type == TYPE_ACTIVE) {
                     if (isClusterPaused) {
                         builder.setContentText(res.getText(R.string.download_paused));
-                    } else if (speedAsSizeText != null) {
-                        builder.setContentText(res.getString(R.string.text_download_speed,
-                                remainingText, speedAsSizeText));
                     } else {
-                        final String description = cursor.getString(UpdateQuery.DESCRIPTION);
-                        if (!TextUtils.isEmpty(description)) {
-                            builder.setContentText(description);
-                        } else {
-                            builder.setContentText(remainingText);
-                        }
+                    final String description = cursor.getString(UpdateQuery.DESCRIPTION);
+                    if (!TextUtils.isEmpty(description)) {
+                        builder.setContentText(description);
                     }
-                    builder.setContentInfo(percentText);
+                        builder.setSubText(subtext);
+                  }
 
                 } else if (type == TYPE_WAITING) {
                     builder.setContentText(
@@ -459,14 +476,7 @@ public class DownloadNotifier {
                     } else {
                         builder.setContentTitle(res.getQuantityString(
                                 R.plurals.notif_summary_active, cluster.size(), cluster.size()));
-                    }
-                    builder.setContentText(remainingText);
-                    builder.setContentInfo(percentText);
-                    if (speedAsSizeText != null) {
-                        inboxStyle.setSummaryText(res.getString(R.string.text_download_speed,
-                                remainingText, speedAsSizeText));
-                    } else {
-                        inboxStyle.setSummaryText(remainingText);
+                        builder.setSubText(subtext);
                     }
 
                 } else if (type == TYPE_WAITING) {
